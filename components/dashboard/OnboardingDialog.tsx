@@ -76,6 +76,11 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
         throw new Error(data.error || "Failed to process resume");
       }
 
+      // Save to local storage cache for instant UI population
+      if (data.parsedData) {
+        localStorage.setItem("jobbuddy_parsed_profile", JSON.stringify(data.parsedData));
+      }
+
       setParsingStep("Saving extracted details...");
 
       setTimeout(() => {

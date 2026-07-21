@@ -75,8 +75,72 @@ export default function ProfilePage() {
     fetchProfileData();
   }, []);
 
+  const populateFromParsedData = (parsedData: any) => {
+    if (!parsedData) return;
+    if (parsedData.fullName) setFullName(parsedData.fullName);
+    if (parsedData.email) setEmail(parsedData.email);
+    if (parsedData.phone) setPhone(parsedData.phone);
+    if (parsedData.location) setLocation(parsedData.location);
+    if (parsedData.headline) setHeadline(parsedData.headline);
+    if (parsedData.summary) setSummary(parsedData.summary);
+    if (Array.isArray(parsedData.skills) && parsedData.skills.length > 0) {
+      setSkills(parsedData.skills);
+    }
+    if (parsedData.links) {
+      if (parsedData.links.linkedin) setLinkedin(parsedData.links.linkedin);
+      if (parsedData.links.github) setGithub(parsedData.links.github);
+      if (parsedData.links.portfolio) setPortfolio(parsedData.links.portfolio);
+    }
+
+    if (Array.isArray(parsedData.workExperiences) && parsedData.workExperiences.length > 0) {
+      setWorkExperiences(
+        parsedData.workExperiences.map((w: any) => ({
+          company: w.company || "Company",
+          title: w.title || "Role",
+          duration: w.duration || "",
+          responsibilities: Array.isArray(w.responsibilities)
+            ? w.responsibilities
+            : [w.responsibilities || ""],
+        }))
+      );
+    }
+
+    if (Array.isArray(parsedData.educations) && parsedData.educations.length > 0) {
+      setEducations(
+        parsedData.educations.map((e: any) => ({
+          institution: e.institution || "University",
+          degree: e.degree || "",
+          fieldOfStudy: e.fieldOfStudy || "",
+          graduationYear: e.graduationYear || "",
+        }))
+      );
+    }
+
+    if (Array.isArray(parsedData.projects) && parsedData.projects.length > 0) {
+      setProjects(
+        parsedData.projects.map((p: any) => ({
+          title: p.title || "Project",
+          description: p.description || "",
+          technologies: Array.isArray(p.technologies) ? p.technologies : [],
+          link: p.link || "",
+        }))
+      );
+    }
+  };
+
   const fetchProfileData = async () => {
     setLoading(true);
+
+    // 1. Instant check from localStorage
+    try {
+      const cached = localStorage.getItem("jobbuddy_parsed_profile");
+      if (cached) {
+        populateFromParsedData(JSON.parse(cached));
+      }
+    } catch (e) {
+      console.warn("Could not read cached profile:", e);
+    }
+
     const supabase = createClient();
     const {
       data: { user },
@@ -88,7 +152,7 @@ export default function ProfilePage() {
     }
 
     try {
-      // 1. Fetch Profile
+      // 2. Fetch Profile from Supabase DB
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
@@ -96,24 +160,26 @@ export default function ProfilePage() {
         .single();
 
       if (profile) {
-        setFullName(profile.full_name || user.user_metadata?.full_name || "");
-        setEmail(profile.email || user.email || "");
-        setPhone(profile.phone || "");
-        setLocation(profile.location || "");
-        setHeadline(profile.headline || "");
-        setSummary(profile.summary || "");
-        setSkills(Array.isArray(profile.skills) ? profile.skills : []);
+        if (profile.full_name) setFullName(profile.full_name);
+        if (profile.email) setEmail(profile.email);
+        if (profile.phone) setPhone(profile.phone);
+        if (profile.location) setLocation(profile.location);
+        if (profile.headline) setHeadline(profile.headline);
+        if (profile.summary) setSummary(profile.summary);
+        if (Array.isArray(profile.skills) && profile.skills.length > 0) {
+          setSkills(profile.skills);
+        }
 
         const links = profile.links || {};
-        setLinkedin(links.linkedin || "");
-        setGithub(links.github || "");
-        setPortfolio(links.portfolio || "");
+        if (links.linkedin) setLinkedin(links.linkedin);
+        if (links.github) setGithub(links.github);
+        if (links.portfolio) setPortfolio(links.portfolio);
       } else {
-        setFullName(user.user_metadata?.full_name || "");
-        setEmail(user.email || "");
+        if (!fullName) setFullName(user.user_metadata?.full_name || "");
+        if (!email) setEmail(user.email || "");
       }
 
-      // 2. Fetch Work Experiences
+      // 3. Fetch Work Experiences
       const { data: workData } = await supabase
         .from("work_experiences")
         .select("*")
@@ -133,7 +199,7 @@ export default function ProfilePage() {
         );
       }
 
-      // 3. Fetch Educations
+      // 4. Fetch Educations
       const { data: eduData } = await supabase
         .from("educations")
         .select("*")
@@ -151,7 +217,7 @@ export default function ProfilePage() {
         );
       }
 
-      // 4. Fetch Projects
+      // 5. Fetch Projects
       const { data: projData } = await supabase
         .from("projects")
         .select("*")
@@ -167,6 +233,18 @@ export default function ProfilePage() {
             link: p.link || "",
           }))
         );
+      }
+
+      // 6. Fail-safe: Check latest resume in Resumes table if fields are still empty
+      const { data: resumeRows } = await supabase
+        .from("resumes")
+        .select("parsed_data")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (resumeRows && resumeRows[0]?.parsed_data) {
+        populateFromParsedData(resumeRows[0].parsed_data);
       }
     } catch (err: any) {
       console.error("Error loading profile:", err);
@@ -254,6 +332,22 @@ export default function ProfilePage() {
         }));
         await supabase.from("projects").insert(projRows);
       }
+
+      // Update cached localStorage copy
+      const updatedProfile = {
+        fullName,
+        email,
+        phone,
+        location,
+        headline,
+        summary,
+        skills,
+        links: { linkedin, github, portfolio },
+        workExperiences,
+        educations,
+        projects,
+      };
+      localStorage.setItem("jobbuddy_parsed_profile", JSON.stringify(updatedProfile));
 
       setSuccessMsg("Profile information updated successfully!");
     } catch (err: any) {
@@ -378,7 +472,7 @@ export default function ProfilePage() {
     return (
       <div className="h-96 flex flex-col items-center justify-center text-center">
         <Loader2 className="w-8 h-8 text-[#57cc99] animate-spin mb-3" />
-        <p className="text-xs text-zinc-400 font-medium">Loading user profile from database...</p>
+        <p className="text-xs text-zinc-400 font-medium">Loading candidate profile...</p>
       </div>
     );
   }
