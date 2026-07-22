@@ -4,7 +4,7 @@
 -- https://supabase.com/dashboard/project/tzueqxnndmmditnkeqcx/sql/new
 -- =========================================================
 
--- 1. Create Profiles Table
+-- 1. Create Profiles Table (User Values & Profile Image URL)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
@@ -15,10 +15,14 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   summary TEXT,
   skills JSONB DEFAULT '[]'::jsonb,
   links JSONB DEFAULT '{}'::jsonb,
+  profile_image_url TEXT,
   has_completed_onboarding BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure profile_image_url column exists if table was already created
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS profile_image_url TEXT;
 
 -- 2. Create Work Experiences Table
 CREATE TABLE IF NOT EXISTS public.work_experiences (
@@ -132,14 +136,14 @@ CREATE POLICY "Users can delete own resumes" ON public.resumes FOR DELETE USING 
 CREATE POLICY "Users can manage own jobs" ON public.jobs FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage own applications" ON public.applications FOR ALL USING (auth.uid() = user_id);
 
--- 8. Create Storage Bucket for Resumes
+-- 8. Create Storage Buckets for Resumes & Avatars
 INSERT INTO storage.buckets (id, name, public) 
-VALUES ('resumes', 'resumes', true)
+VALUES ('resumes', 'resumes', true), ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage RLS Policies
 CREATE POLICY "Authenticated users can upload resumes" ON storage.objects
-FOR INSERT TO authenticated WITH CHECK (bucket_id = 'resumes');
+FOR INSERT TO authenticated WITH CHECK (bucket_id IN ('resumes', 'avatars'));
 
 CREATE POLICY "Authenticated users can read resumes" ON storage.objects
-FOR SELECT TO authenticated USING (bucket_id = 'resumes');
+FOR SELECT TO authenticated USING (bucket_id IN ('resumes', 'avatars'));

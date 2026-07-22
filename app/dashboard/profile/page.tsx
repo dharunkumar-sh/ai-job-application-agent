@@ -477,6 +477,8 @@ export default function ProfilePage() {
     );
   }
 
+  const defaultAvatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(fullName || "User")}`;
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-16">
       {/* Header Banner */}

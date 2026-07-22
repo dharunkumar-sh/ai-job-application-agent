@@ -30,14 +30,27 @@ export function OnboardingWrapper({
 
     if (!user) return;
 
+    // Check profile onboarding flag
     const { data: profile } = await supabase
       .from("profiles")
-      .select("has_completed_onboarding")
+      .select("has_completed_onboarding, headline, summary")
       .eq("id", user.id)
       .single();
 
-    if (!profile || !profile.has_completed_onboarding) {
+    // Check if user has uploaded at least 1 resume
+    const { data: resumes } = await supabase
+      .from("resumes")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1);
+
+    const hasResume = resumes && resumes.length > 0;
+    const hasProfileInfo = profile && (profile.headline || profile.summary);
+
+    if (!profile || (!profile.has_completed_onboarding && !hasResume && !hasProfileInfo)) {
       setIsOpen(true);
+    } else {
+      setIsOpen(false);
     }
   };
 

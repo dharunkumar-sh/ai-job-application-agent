@@ -1,4 +1,31 @@
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
+
+export interface WorkExperience {
+  company: string;
+  title: string;
+  duration: string;
+  responsibilities: string[];
+}
+
+export interface Education {
+  institution: string;
+  degree: string;
+  fieldOfStudy: string;
+  graduationYear: string;
+}
+
+export interface Project {
+  title: string;
+  description: string;
+  technologies: string[];
+  link: string;
+}
+
+export interface Certification {
+  name: string;
+  issuer?: string;
+  date?: string;
+}
 
 export interface ParsedResumeData {
   fullName: string;
@@ -7,59 +34,32 @@ export interface ParsedResumeData {
   location: string;
   headline: string;
   summary: string;
+  profileImageUrl?: string;
   skills: string[];
   links: {
     linkedin?: string;
     github?: string;
     portfolio?: string;
+    [key: string]: string | undefined;
   };
-  workExperiences: {
-    company: string;
-    title: string;
-    duration: string;
-    responsibilities: string[];
-  }[];
-  educations: {
-    institution: string;
-    degree: string;
-    fieldOfStudy: string;
-    graduationYear: string;
-  }[];
-  projects: {
-    title: string;
-    description: string;
-    technologies: string[];
-    link: string;
-  }[];
+  workExperiences: WorkExperience[];
+  educations: Education[];
+  projects: Project[];
+  certifications?: Certification[];
 }
 
-export async function parseResumeWithOpenRouter(
-  resumeText: string
-): Promise<ParsedResumeData> {
-  const apiKey =
-    process.env.OPENROUTER_API_KEY ||
-    process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ||
-    "REMOVED_SECRET";
+const SYSTEM_PROMPT = `You are an expert AI Resume Parser. Your job is to thoroughly analyze candidate resume documents (PDF, DOCX, TXT) and extract all important professional details into a single valid JSON object.
 
-  const openai = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: apiKey,
-    defaultHeaders: {
-      "HTTP-Referer": "https://jobbuddy-ai.vercel.app",
-      "X-Title": "JobBuddy AI",
-    },
-  });
+Extract as much rich detail as available in the resume. Return ONLY valid JSON with no markdown formatting surrounding it, matching this EXACT JSON schema:
 
-  const systemPrompt = `You are an expert AI Resume Parser. Analyze the candidate's resume text and extract structured JSON matching EXACTLY the specified JSON schema.
-
-Do NOT return markdown wrapper formatting, backticks, or extra text. Output ONLY valid JSON matching this schema:
 {
   "fullName": "Candidate Full Name",
-  "email": "email@domain.com",
-  "phone": "+1234567890",
-  "location": "City, Country or Remote",
-  "headline": "Target Role or Professional Headline (e.g. Senior Software Engineer)",
-  "summary": "Professional summary paragraph",
+  "email": "candidate.email@domain.com",
+  "phone": "+1 (555) 000-0000",
+  "location": "City, State / Remote",
+  "headline": "Current or Target Professional Title",
+  "summary": "Full professional summary or objective statement from resume",
+  "profileImageUrl": "https://... or empty string if not found",
   "skills": ["Skill 1", "Skill 2", "Skill 3"],
   "links": {
     "linkedin": "https://linkedin.com/in/...",
@@ -69,266 +69,220 @@ Do NOT return markdown wrapper formatting, backticks, or extra text. Output ONLY
   "workExperiences": [
     {
       "company": "Company Name",
-      "title": "Job Title",
-      "duration": "Start Date - End Date",
-      "responsibilities": ["Bullet point 1", "Bullet point 2"]
+      "title": "Job Title / Role",
+      "duration": "Dates of employment (e.g. Jan 2021 - Present)",
+      "responsibilities": [
+        "Key responsibility or bullet point achievement 1",
+        "Key responsibility or bullet point achievement 2"
+      ]
     }
   ],
   "educations": [
     {
-      "institution": "University / Institution Name",
-      "degree": "Degree Name (e.g. B.S. Computer Science)",
-      "fieldOfStudy": "Field of Study",
-      "graduationYear": "2023"
+      "institution": "University / School Name",
+      "degree": "Degree Title (e.g. Bachelor of Science)",
+      "fieldOfStudy": "Field of study or Major",
+      "graduationYear": "Year of graduation or attendance (e.g. 2022)"
     }
   ],
   "projects": [
     {
       "title": "Project Title",
-      "description": "Short project description",
+      "description": "Detailed project description and key accomplishments",
       "technologies": ["Tech 1", "Tech 2"],
       "link": "https://..."
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Certification Name",
+      "issuer": "Issuing Organization",
+      "date": "Year or Date"
     }
   ]
 }`;
 
-  const userPrompt = `Extract structured candidate details from the following resume text:\n\n${resumeText}`;
+/**
+ * Parses resume file content (PDF, DOCX, TXT) using Google Gemini AI SDK with model gemini-3.1-flash-lite
+ */
+export async function parseResumeWithGemini(
+  input: {
+    buffer?: Buffer;
+    text?: string;
+    mimeType?: string;
+    fileName?: string;
+  } | string
+): Promise<ParsedResumeData> {
+  const apiKey =
+    process.env.GEMINI_API_KEY || "AIzaSyAjr2pyjuJi0rmLiHQD_eiuB3VQqOBjccg";
+  const modelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
-  // Specified model poolside/laguna-xs-2.1:free with OpenRouter API Key
-  const primaryModel = "poolside/laguna-xs-2.1:free";
-  const fallbackModels = [
-    "google/gemini-2.5-flash:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "openai/gpt-3.5-turbo",
-  ];
+  const ai = new GoogleGenAI({ apiKey });
 
-  let rawContent = "";
+  let textContent = "";
+  let base64Data = "";
+  let mimeType = "application/pdf";
+
+  if (typeof input === "string") {
+    textContent = input;
+  } else {
+    mimeType = input.mimeType || "application/pdf";
+    if (input.text) {
+      textContent = input.text;
+    }
+    if (input.buffer) {
+      base64Data = input.buffer.toString("base64");
+    }
+  }
+
+  const promptText = `Please parse this resume document and extract all details strictly according to the specified JSON schema. Ensure complete extraction of work experience, bullet points, skills, education, projects, contact info, summary, and profile photo URL if any.`;
+
+  let parts: any[] = [{ text: `${SYSTEM_PROMPT}\n\n${promptText}` }];
+
+  if (base64Data && mimeType) {
+    parts.push({
+      inlineData: {
+        mimeType: mimeType === "application/octet-stream" ? "application/pdf" : mimeType,
+        data: base64Data,
+      },
+    });
+  }
+
+  if (textContent) {
+    parts.push({
+      text: `RESUME CONTENT:\n${textContent}`,
+    });
+  }
 
   try {
-    const response = await openai.chat.completions.create({
-      model: primaryModel,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: [
+        {
+          role: "user",
+          parts: parts,
+        },
       ],
-      temperature: 0.1,
     });
 
-    rawContent = response.choices[0]?.message?.content || "";
+    const rawText = response.text || "";
+    const parsed = cleanAndParseJsonResponse(rawText);
+    if (parsed) {
+      return normalizeParsedData(parsed);
+    }
   } catch (error) {
-    console.warn(`Primary model ${primaryModel} failed, trying fallback models...`, error);
-
-    for (const model of fallbackModels) {
+    console.error("Gemini AI Resume Parsing Error:", error);
+    if (base64Data && textContent) {
       try {
-        const response = await openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
+        const retryRes = await ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: `${SYSTEM_PROMPT}\n\n${promptText}` },
+                { text: `RESUME TEXT CONTENT:\n${textContent}` },
+              ],
+            },
           ],
-          temperature: 0.1,
         });
-
-        rawContent = response.choices[0]?.message?.content || "";
-        if (rawContent) break;
-      } catch (err) {
-        console.warn(`Fallback model ${model} failed:`, err);
+        const retryParsed = cleanAndParseJsonResponse(retryRes.text || "");
+        if (retryParsed) {
+          return normalizeParsedData(retryParsed);
+        }
+      } catch (retryErr) {
+        console.error("Gemini AI Retry failed:", retryErr);
       }
     }
   }
 
-  // Extract JSON payload using regex matcher
-  let cleanJsonString = rawContent.trim();
-  const jsonMatch = cleanJsonString.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    cleanJsonString = jsonMatch[0];
-  }
-
-  if (cleanJsonString) {
-    try {
-      const parsed = JSON.parse(cleanJsonString);
-
-      return {
-        fullName: parsed.fullName || extractNameFromText(resumeText),
-        email: parsed.email || extractEmailFromText(resumeText),
-        phone: parsed.phone || extractPhoneFromText(resumeText),
-        location: parsed.location || "Remote / On-site",
-        headline: parsed.headline || "Software Professional",
-        summary: parsed.summary || extractSummaryFromText(resumeText),
-        skills: Array.isArray(parsed.skills) && parsed.skills.length > 0
-          ? parsed.skills
-          : extractSkillsFromText(resumeText),
-        links: parsed.links || {},
-        workExperiences: Array.isArray(parsed.workExperiences) && parsed.workExperiences.length > 0
-          ? parsed.workExperiences.map((w: any) => ({
-              company: w.company || "Company",
-              title: w.title || "Role",
-              duration: w.duration || "",
-              responsibilities: Array.isArray(w.responsibilities)
-                ? w.responsibilities
-                : [w.responsibilities || ""],
-            }))
-          : extractWorkFromText(resumeText),
-        educations: Array.isArray(parsed.educations) && parsed.educations.length > 0
-          ? parsed.educations.map((e: any) => ({
-              institution: e.institution || "University",
-              degree: e.degree || "",
-              fieldOfStudy: e.fieldOfStudy || "",
-              graduationYear: e.graduationYear || "",
-            }))
-          : extractEducationFromText(resumeText),
-        projects: Array.isArray(parsed.projects) && parsed.projects.length > 0
-          ? parsed.projects.map((p: any) => ({
-              title: p.title || "Project",
-              description: p.description || "",
-              technologies: Array.isArray(p.technologies) ? p.technologies : [],
-              link: p.link || "",
-            }))
-          : [],
-      };
-    } catch (jsonErr) {
-      console.error("JSON parsing error from AI response:", jsonErr);
-    }
-  }
-
-  // Fallback text parsing if API response fails JSON parsing
-  return extractFallbackFromText(resumeText);
-}
-
-// Keep export alias
-export const parseResumeWithGemini = parseResumeWithOpenRouter;
-
-// Robust Regex & Heuristic Fallback Text Parsers
-function extractNameFromText(text: string): string {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  for (const line of lines.slice(0, 5)) {
-    if (line.length > 2 && line.length < 40 && !line.includes("@") && !line.includes("http")) {
-      return line.replace(/[^a-zA-Z\s]/g, "").trim();
-    }
-  }
-  return "Candidate Profile";
-}
-
-function extractEmailFromText(text: string): string {
-  const match = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-  return match ? match[0] : "";
-}
-
-function extractPhoneFromText(text: string): string {
-  const match = text.match(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
-  return match ? match[0] : "";
-}
-
-function extractSummaryFromText(text: string): string {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  const summaryIndex = lines.findIndex((l) =>
-    /summary|profile|about|overview/i.test(l)
-  );
-  if (summaryIndex !== -1 && lines[summaryIndex + 1]) {
-    return lines.slice(summaryIndex + 1, summaryIndex + 4).join(" ");
-  }
-  return text.substring(0, 300).trim();
-}
-
-function extractSkillsFromText(text: string): string[] {
-  const commonSkills = [
-    "JavaScript",
-    "TypeScript",
-    "React",
-    "Next.js",
-    "Node.js",
-    "Python",
-    "Java",
-    "C++",
-    "SQL",
-    "PostgreSQL",
-    "HTML",
-    "CSS",
-    "Tailwind",
-    "Git",
-    "Docker",
-    "AWS",
-    "REST API",
-  ];
-  const found = commonSkills.filter((skill) =>
-    new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text)
-  );
-  return found.length > 0 ? found : ["Problem Solving", "Software Engineering", "Team Leadership"];
-}
-
-function extractWorkFromText(text: string) {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  const expIndex = lines.findIndex((l) => /experience|employment|work history/i.test(l));
-
-  if (expIndex !== -1 && lines.length > expIndex + 1) {
-    const expLines = lines.slice(expIndex + 1, expIndex + 8);
-    return [
-      {
-        company: expLines[0] || "Target Company",
-        title: expLines[1] || "Software Engineer",
-        duration: "Recent",
-        responsibilities: expLines.slice(2, 6).filter((l) => l.length > 10),
-      },
-    ];
-  }
-
-  return [
-    {
-      company: "Technology Enterprise",
-      title: "Software Engineer",
-      duration: "2022 - Present",
-      responsibilities: [
-        "Developed web applications and cloud API services.",
-        "Delivered production features following software engineering best practices.",
-      ],
-    },
-  ];
-}
-
-function extractEducationFromText(text: string) {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  const eduIndex = lines.findIndex((l) => /education|academic|degree/i.test(l));
-
-  if (eduIndex !== -1 && lines.length > eduIndex + 1) {
-    return [
-      {
-        institution: lines[eduIndex + 1] || "University",
-        degree: lines[eduIndex + 2] || "Bachelor of Science",
-        fieldOfStudy: "Computer Science",
-        graduationYear: "2023",
-      },
-    ];
-  }
-
-  return [
-    {
-      institution: "State University",
-      degree: "Bachelor of Science",
-      fieldOfStudy: "Computer Science & Engineering",
-      graduationYear: "2023",
-    },
-  ];
-}
-
-function extractFallbackFromText(text: string): ParsedResumeData {
   return {
-    fullName: extractNameFromText(text),
-    email: extractEmailFromText(text),
-    phone: extractPhoneFromText(text),
+    fullName: "Candidate Profile",
+    email: "",
+    phone: "",
     location: "Remote / On-site",
-    headline: "Software Engineer",
-    summary: extractSummaryFromText(text),
-    skills: extractSkillsFromText(text),
+    headline: "Professional Candidate",
+    summary: textContent ? textContent.slice(0, 300) : "Uploaded resume candidate profile",
+    profileImageUrl: `https://api.dicebear.com/7.x/initials/svg?seed=Candidate%20Profile`,
+    skills: ["Problem Solving", "Communication", "Professional Skills"],
     links: {},
-    workExperiences: extractWorkFromText(text),
-    educations: extractEducationFromText(text),
-    projects: [
-      {
-        title: "Career & Resume Workspace Project",
-        description: "Developed AI-enabled job tracking application.",
-        technologies: ["React", "TypeScript", "Next.js"],
-        link: "",
-      },
-    ],
+    workExperiences: [],
+    educations: [],
+    projects: [],
+    certifications: [],
+  };
+}
+
+export const parseResumeWithOpenRouter = parseResumeWithGemini;
+
+function cleanAndParseJsonResponse(rawText: string): any {
+  let cleaned = rawText.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "");
+  }
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[0];
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.warn("Could not parse JSON output from Gemini AI:", e, "\nRaw text:", rawText);
+    return null;
+  }
+}
+
+function normalizeParsedData(parsed: any): ParsedResumeData {
+  const name = parsed.fullName || "Candidate Profile";
+  const defaultAvatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+
+  return {
+    fullName: name,
+    email: parsed.email || "",
+    phone: parsed.phone || "",
+    location: parsed.location || "Remote / On-site",
+    headline: parsed.headline || "Software Professional",
+    summary: parsed.summary || "",
+    profileImageUrl: parsed.profileImageUrl && parsed.profileImageUrl.startsWith("http")
+      ? parsed.profileImageUrl
+      : defaultAvatar,
+    skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+    links: typeof parsed.links === "object" && parsed.links !== null ? parsed.links : {},
+    workExperiences: Array.isArray(parsed.workExperiences)
+      ? parsed.workExperiences.map((w: any) => ({
+          company: w.company || "Company",
+          title: w.title || "Role",
+          duration: w.duration || "",
+          responsibilities: Array.isArray(w.responsibilities)
+            ? w.responsibilities
+            : typeof w.responsibilities === "string"
+            ? [w.responsibilities]
+            : [],
+        }))
+      : [],
+    educations: Array.isArray(parsed.educations)
+      ? parsed.educations.map((e: any) => ({
+          institution: e.institution || "Institution",
+          degree: e.degree || "",
+          fieldOfStudy: e.fieldOfStudy || e.field_of_study || "",
+          graduationYear: e.graduationYear || e.graduation_year || "",
+        }))
+      : [],
+    projects: Array.isArray(parsed.projects)
+      ? parsed.projects.map((p: any) => ({
+          title: p.title || "Project",
+          description: p.description || "",
+          technologies: Array.isArray(p.technologies) ? p.technologies : [],
+          link: p.link || "",
+        }))
+      : [],
+    certifications: Array.isArray(parsed.certifications)
+      ? parsed.certifications.map((c: any) => ({
+          name: typeof c === "string" ? c : c.name || "Certification",
+          issuer: typeof c === "object" ? c.issuer || "" : "",
+          date: typeof c === "object" ? c.date || "" : "",
+        }))
+      : [],
   };
 }

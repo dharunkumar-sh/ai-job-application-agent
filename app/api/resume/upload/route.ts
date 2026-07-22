@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { parseResumeWithOpenRouter } from "@/lib/ai/parse-resume";
+import { parseResumeWithGemini } from "@/lib/ai/parse-resume";
 
 export async function POST(request: Request) {
   try {
@@ -24,32 +24,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Read File Buffer & Extract Text
+    // 1. Read File Content Buffer & Text representation
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    let extractedText = "";
+    let rawFileContent = "";
 
-    if (file.name.toLowerCase().endsWith(".pdf")) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require("pdf-parse");
-        const pdfData = await pdfParse(buffer);
-        extractedText = pdfData.text || "";
-      } catch (pdfErr) {
-        console.warn("pdf-parse error, reading buffer text fallback:", pdfErr);
-        extractedText = buffer.toString("utf-8");
-      }
-    } else {
-      extractedText = buffer.toString("utf-8");
+    try {
+      rawFileContent = buffer.toString("utf-8");
+    } catch (e) {
+      console.warn("Could not convert buffer to utf-8 text:", e);
     }
 
-    if (!extractedText || extractedText.trim().length === 0) {
-      extractedText = `Resume File Name: ${file.name}\nCandidate Email: ${user.email}`;
-    }
-
-    // 2. Upload file to Supabase Storage (Bucket: resumes)
+    // 2. Upload file to Supabase Storage bucket 'resumes'
     const timeStamp = Date.now();
-    const filePath = `${user.id}/${timeStamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `${user.id}/${timeStamp}_${safeFileName}`;
     let fileUrl = "";
 
     try {
@@ -66,35 +55,47 @@ export async function POST(request: Request) {
           .getPublicUrl(filePath);
         fileUrl = urlData.publicUrl || "";
       } else {
-        console.warn("Supabase Storage upload warning (proceeding with DB record):", storageError?.message);
-        fileUrl = `/uploads/${file.name}`;
+        console.warn("Storage upload notice:", storageError?.message);
+        fileUrl = `/uploads/${safeFileName}`;
       }
     } catch (stErr) {
-      console.warn("Storage upload exception caught:", stErr);
-      fileUrl = `/uploads/${file.name}`;
+      console.warn("Storage upload exception:", stErr);
+      fileUrl = `/uploads/${safeFileName}`;
     }
 
-    // 3. AI Resume Parsing using OpenRouter SDK (poolside/laguna-xs-2.1:free)
-    const parsedData = await parseResumeWithOpenRouter(extractedText);
+    // 3. AI Model Gemini gemini-3.1-flash-lite Parsing
+    const parsedData = await parseResumeWithGemini({
+      buffer: buffer,
+      text: rawFileContent,
+      mimeType: file.type || "application/pdf",
+      fileName: file.name,
+    });
 
-    // Ensure fallback user identity details from session if missing in resume
-    const fullName = parsedData.fullName !== "Candidate Full Name" && parsedData.fullName !== "John Doe"
-      ? parsedData.fullName
-      : (user.user_metadata?.full_name || user.email?.split("@")[0] || "User");
+    const fullName =
+      parsedData.fullName &&
+      parsedData.fullName !== "Candidate Profile" &&
+      parsedData.fullName !== "Candidate Full Name"
+        ? parsedData.fullName
+        : (user.user_metadata?.full_name || user.email?.split("@")[0] || "User");
+
     const email = parsedData.email || user.email || "";
+    const profileImageUrl =
+      parsedData.profileImageUrl ||
+      `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(fullName)}`;
 
-    // 4. Save/Update Profile in Supabase DB
+    // 4. Save/Update Candidate Profile in Supabase DB (including profile_image_url)
     const { error: profileError } = await supabase.from("profiles").upsert(
       {
         id: user.id,
         full_name: fullName,
         email: email,
-        phone: parsedData.phone,
-        location: parsedData.location,
-        headline: parsedData.headline,
-        summary: parsedData.summary,
-        skills: parsedData.skills,
-        links: parsedData.links,
+        phone: parsedData.phone || "",
+        location: parsedData.location || "",
+        headline: parsedData.headline || "",
+        summary: parsedData.summary || "",
+        skills: parsedData.skills || [],
+        links: parsedData.links || {},
+        profile_image_url: profileImageUrl,
         has_completed_onboarding: true,
         updated_at: new Date().toISOString(),
       },
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
     );
 
     if (profileError) {
-      console.warn("Profile table upsert warning:", profileError.message);
+      console.warn("Profile table upsert notice:", profileError.message);
     }
 
     // 5. Replace Work Experiences in DB
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
         await supabase.from("work_experiences").insert(workRows);
       }
     } catch (workErr) {
-      console.warn("Work experiences DB insert warning:", workErr);
+      console.warn("Work experiences DB insert notice:", workErr);
     }
 
     // 6. Replace Educations in DB
@@ -136,7 +137,7 @@ export async function POST(request: Request) {
         await supabase.from("educations").insert(eduRows);
       }
     } catch (eduErr) {
-      console.warn("Educations DB insert warning:", eduErr);
+      console.warn("Educations DB insert notice:", eduErr);
     }
 
     // 7. Replace Projects in DB
@@ -153,7 +154,7 @@ export async function POST(request: Request) {
         await supabase.from("projects").insert(projRows);
       }
     } catch (projErr) {
-      console.warn("Projects DB insert warning:", projErr);
+      console.warn("Projects DB insert notice:", projErr);
     }
 
     // 8. Record Uploaded Resume in Resumes Table
@@ -163,25 +164,29 @@ export async function POST(request: Request) {
         filename: file.name,
         file_path: filePath,
         file_url: fileUrl,
-        parsed_data: parsedData,
+        parsed_data: {
+          ...parsedData,
+          profileImageUrl,
+        },
       });
     } catch (resErr) {
-      console.warn("Resumes DB insert warning:", resErr);
+      console.warn("Resumes DB insert notice:", resErr);
     }
 
     return NextResponse.json({
       success: true,
-      message: "Resume uploaded and parsed successfully!",
+      message: "Resume uploaded and parsed via Gemini AI model successfully!",
       parsedData: {
         ...parsedData,
         fullName,
         email,
+        profileImageUrl,
       },
     });
   } catch (error: any) {
     console.error("Resume Upload API Error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to process resume." },
+      { error: error.message || "Failed to process resume via Gemini AI model." },
       { status: 500 }
     );
   }

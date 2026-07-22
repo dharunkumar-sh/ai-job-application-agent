@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   UploadCloud,
@@ -9,7 +9,8 @@ import {
   Sparkles,
   Bot,
   AlertCircle,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2
 } from "lucide-react";
 
 interface OnboardingDialogProps {
@@ -24,6 +25,17 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const router = useRouter();
+
+  // Prevent closing on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isOpen && e.key === "Escape") {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -51,19 +63,19 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
 
     setUploading(true);
     setErrorMsg(null);
-    setParsingStep("Uploading resume...");
+    setParsingStep("Uploading resume to Supabase Storage...");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
 
       setTimeout(() => {
-        setParsingStep("Analyzing resume content with AI...");
-      }, 1200);
+        setParsingStep("Parsing resume content with Google Gemini AI...");
+      }, 1000);
 
       setTimeout(() => {
-        setParsingStep("Extracting profile, skills, experiences, and education...");
-      }, 2800);
+        setParsingStep("Extracting candidate profile, skills, experience & education...");
+      }, 2500);
 
       const res = await fetch("/api/resume/upload", {
         method: "POST",
@@ -73,25 +85,25 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to process resume");
+        throw new Error(data.error || "Failed to process resume with Gemini AI");
       }
 
-      // Save to local storage cache for instant UI population
+      // Store in localStorage cache for immediate UI responsiveness
       if (data.parsedData) {
         localStorage.setItem("jobbuddy_parsed_profile", JSON.stringify(data.parsedData));
       }
 
-      setParsingStep("Saving extracted details...");
+      setParsingStep("Saving extracted details to database...");
 
       setTimeout(() => {
         setUploading(false);
         onComplete();
         router.push("/dashboard/profile");
         router.refresh();
-      }, 800);
+      }, 600);
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || "An unexpected error occurred.");
+      console.error("Onboarding Upload Error:", err);
+      setErrorMsg(err.message || "An unexpected error occurred during parsing.");
       setUploading(false);
       setParsingStep(null);
     }
@@ -99,21 +111,22 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
 
   return (
     <div
-      className="fixed inset-0 bg-[#0f0f12]/90 backdrop-blur-2xl z-50 flex items-center justify-center p-4 selection:bg-[#57cc99] selection:text-[#0f0f12]"
+      className="fixed inset-0 bg-[#0f0f12]/95 backdrop-blur-2xl z-50 flex items-center justify-center p-4 selection:bg-[#57cc99] selection:text-[#0f0f12]"
       role="dialog"
       aria-modal="true"
+      onClick={(e) => e.stopPropagation()} // Prevent backdrop clicks from closing
     >
       <div className="w-full max-w-lg bg-[#16161b] border border-[#23232b] rounded-3xl p-8 shadow-2xl shadow-black relative overflow-hidden">
         {/* Glow Accent */}
-        <div className="absolute top-0 right-0 w-72 h-72 bg-[#57cc99]/15 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#57cc99]/15 blur-[120px] rounded-full pointer-events-none" />
 
         {/* Header */}
         <div className="text-center mb-6 relative z-10">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#57cc99] via-[#46b887] to-[#80ed99] text-[#0f0f12] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#57cc99]/20">
-            <Bot className="w-8 h-8 stroke-[2.2]" />
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#57cc99] via-[#46b887] to-[#80ed99] text-[#0f0f12] flex items-center justify-center mx-auto mb-4 shadow-xl shadow-[#57cc99]/20">
+            <Bot className="w-9 h-9 stroke-[2.2]" />
           </div>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#57cc99]/10 border border-[#57cc99]/30 text-[#57cc99] text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#57cc99]/10 border border-[#57cc99]/30 text-[#57cc99] text-xs font-semibold uppercase tracking-wider mb-2">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Welcome to JobBuddy AI</span>
           </div>
@@ -121,8 +134,8 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           <h2 className="text-2xl font-black text-white tracking-tight">
             Upload Your Resume
           </h2>
-          <p className="mt-1.5 text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
-            Please upload your resume to get started. Our AI will automatically parse your skills, experience, and profile details.
+          <p className="mt-2 text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
+            Upload your resume to get started. Our AI will automatically parse your skills, work experience, education, and profile details to set up your account.
           </p>
         </div>
 
@@ -148,11 +161,11 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                 ? "border-[#57cc99] bg-[#57cc99]/10"
                 : "border-[#23232b] bg-[#0f0f12] hover:border-[#57cc99]/50"
             }`}
-            onClick={() => document.getElementById("resume-file-input")?.click()}
+            onClick={() => document.getElementById("onboarding-file-input")?.click()}
           >
             <input
               type="file"
-              id="resume-file-input"
+              id="onboarding-file-input"
               accept=".pdf,.txt,.docx"
               className="hidden"
               onChange={handleFileChange}
@@ -196,7 +209,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                 <span>{parsingStep}</span>
               </div>
               <div className="w-full h-1.5 rounded-full bg-[#1e1e26] overflow-hidden">
-                <div className="h-full bg-[#57cc99] rounded-full animate-pulse w-3/4" />
+                <div className="h-full bg-[#57cc99] rounded-full animate-pulse w-4/5 transition-all duration-500" />
               </div>
             </div>
           )}
@@ -212,7 +225,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
             {uploading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Parsing with AI...</span>
+                <span>Parsing with Gemini AI...</span>
               </>
             ) : (
               <>
@@ -225,7 +238,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           {/* Trust Footer */}
           <div className="pt-2 flex items-center justify-center gap-2 text-[11px] text-zinc-500">
             <ShieldCheck className="w-3.5 h-3.5 text-[#57cc99]" />
-            <span>Securely stored & encrypted</span>
+            <span>Encrypted & stored in Supabase Storage</span>
           </div>
         </div>
       </div>

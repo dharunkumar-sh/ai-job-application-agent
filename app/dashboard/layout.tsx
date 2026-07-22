@@ -18,20 +18,23 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const fullName = user.user_metadata?.full_name || "User";
+  let fullName = user.user_metadata?.full_name || "User";
   const email = user.email || "";
-
-  // Check onboarding status in DB
+  let profileImageUrl = "";
   let hasCompletedOnboarding = false;
+
+  // Check onboarding status and fetch profile details from DB
   try {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("has_completed_onboarding")
+      .select("has_completed_onboarding, full_name, profile_image_url")
       .eq("id", user.id)
       .single();
 
-    if (profile && profile.has_completed_onboarding) {
-      hasCompletedOnboarding = true;
+    if (profile) {
+      if (profile.full_name) fullName = profile.full_name;
+      if (profile.profile_image_url) profileImageUrl = profile.profile_image_url;
+      if (profile.has_completed_onboarding) hasCompletedOnboarding = true;
     }
   } catch (err) {
     console.warn("Could not fetch profile onboarding status:", err);
@@ -75,9 +78,17 @@ export default async function DashboardLayout({
 
             {/* User Profile Badge */}
             <div className="flex items-center gap-3 pl-3 border-l border-[#23232b]">
-              <div className="w-9 h-9 rounded-2xl bg-[#57cc99] flex items-center justify-center font-extrabold text-[#0f0f12] text-sm shadow-md shadow-[#57cc99]/20">
-                {fullName.substring(0, 2).toUpperCase()}
-              </div>
+              {profileImageUrl ? (
+                <img
+                  src={profileImageUrl}
+                  alt={fullName}
+                  className="w-9 h-9 rounded-2xl object-cover border border-[#57cc99]/30 shadow-md shadow-[#57cc99]/20"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-2xl bg-[#57cc99] flex items-center justify-center font-extrabold text-[#0f0f12] text-sm shadow-md shadow-[#57cc99]/20">
+                  {fullName.substring(0, 2).toUpperCase()}
+                </div>
+              )}
               <div className="hidden sm:block text-left">
                 <div className="text-xs font-bold text-white leading-tight truncate max-w-[140px]">
                   {fullName}
