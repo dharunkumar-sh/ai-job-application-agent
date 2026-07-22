@@ -72,28 +72,61 @@ CREATE TABLE IF NOT EXISTS public.resumes (
 CREATE TABLE IF NOT EXISTS public.jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  platform TEXT,
   title TEXT NOT NULL,
   company TEXT NOT NULL,
+  company_logo TEXT,
   location TEXT,
-  job_type TEXT,
-  status TEXT DEFAULT 'Applied',
   salary TEXT,
-  url TEXT,
+  job_type TEXT,
+  experience_level TEXT,
   description TEXT,
+  tags JSONB DEFAULT '[]'::jsonb,
   match_score INT DEFAULT 85,
-  applied_date TIMESTAMPTZ DEFAULT NOW(),
+  job_url TEXT,
+  source_url TEXT,
+  applied_status BOOLEAN DEFAULT false,
+  saved_status BOOLEAN DEFAULT false,
+  fetched_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure jobs table has all required columns if already created
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS platform TEXT;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS company_logo TEXT;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS experience_level TEXT;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS job_url TEXT;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS source_url TEXT;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS applied_status BOOLEAN DEFAULT false;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS saved_status BOOLEAN DEFAULT false;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS fetched_at TIMESTAMPTZ DEFAULT NOW();
 
 -- 7. Create Applications Status Table
 CREATE TABLE IF NOT EXISTS public.applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   job_id UUID REFERENCES public.jobs(id) ON DELETE SET NULL,
-  status TEXT NOT NULL,
+  platform TEXT,
+  status TEXT NOT NULL DEFAULT 'Pending',
+  detected_fields JSONB DEFAULT '[]'::jsonb,
+  missing_fields JSONB DEFAULT '[]'::jsonb,
+  browserbase_session_id TEXT,
+  browserbase_debug_url TEXT,
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  submitted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure applications table has all required columns if already created
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS platform TEXT;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS detected_fields JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS missing_fields JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS browserbase_session_id TEXT;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS browserbase_debug_url TEXT;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

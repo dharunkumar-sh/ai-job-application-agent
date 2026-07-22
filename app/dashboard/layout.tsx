@@ -27,14 +27,31 @@ export default async function DashboardLayout({
   try {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("has_completed_onboarding, full_name, profile_image_url")
+      .select("has_completed_onboarding, full_name, profile_image_url, headline, summary, skills")
       .eq("id", user.id)
       .single();
+
+    const { data: resumes } = await supabase
+      .from("resumes")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1);
 
     if (profile) {
       if (profile.full_name) fullName = profile.full_name;
       if (profile.profile_image_url) profileImageUrl = profile.profile_image_url;
-      if (profile.has_completed_onboarding) hasCompletedOnboarding = true;
+      if (
+        profile.has_completed_onboarding ||
+        profile.headline ||
+        profile.summary ||
+        (Array.isArray(profile.skills) && profile.skills.length > 0)
+      ) {
+        hasCompletedOnboarding = true;
+      }
+    }
+
+    if (resumes && resumes.length > 0) {
+      hasCompletedOnboarding = true;
     }
   } catch (err) {
     console.warn("Could not fetch profile onboarding status:", err);

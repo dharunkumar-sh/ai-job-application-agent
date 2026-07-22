@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   User,
@@ -531,6 +532,11 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {/* Missing Required Profile Fields Alert Banner from AI Apply */}
+      <Suspense fallback={null}>
+        <MissingFieldsBanner />
+      </Suspense>
+
       {/* SECTION 1: Personal Details */}
       <div className="bg-[#16161b] border border-[#23232b] rounded-3xl p-6 sm:p-8 space-y-6 shadow-lg">
         <h2 className="text-lg font-bold text-white flex items-center gap-2.5 pb-4 border-b border-[#23232b]">
@@ -1058,6 +1064,42 @@ export default function ProfilePage() {
           )}
         </button>
       </div>
+    </div>
+  );
+}
+
+function MissingFieldsBanner() {
+  const searchParams = useSearchParams();
+  const missingRaw = searchParams.get("missing");
+
+  if (!missingRaw) return null;
+
+  const missingList = missingRaw.split(",").filter(Boolean);
+
+  if (missingList.length === 0) return null;
+
+  return (
+    <div className="p-5 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-300 space-y-2.5 shadow-xl animate-in fade-in">
+      <div className="flex items-center gap-2 font-bold text-sm">
+        <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+        <span>Action Required for AI Job Application</span>
+      </div>
+      <p className="text-xs text-amber-200/90 leading-relaxed">
+        The AI Job Agent detected missing required information on your profile for automatic submission:
+      </p>
+      <div className="flex flex-wrap gap-2 pt-1">
+        {missingList.map((item, idx) => (
+          <span
+            key={idx}
+            className="px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-xs font-extrabold text-amber-100"
+          >
+            ! {item}
+          </span>
+        ))}
+      </div>
+      <p className="text-[11px] text-amber-300/80 pt-1">
+        Please fill in these missing fields below and click "Save Complete Profile" to proceed with automated job submission.
+      </p>
     </div>
   );
 }

@@ -63,14 +63,14 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
 
     setUploading(true);
     setErrorMsg(null);
-    setParsingStep("Uploading resume to Supabase Storage...");
+    setParsingStep("Uploading resume securely...");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
 
       setTimeout(() => {
-        setParsingStep("Parsing resume content with Google Gemini AI...");
+        setParsingStep("Parsing resume content with AI...");
       }, 1000);
 
       setTimeout(() => {
@@ -85,7 +85,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to process resume with Gemini AI");
+        throw new Error(data.error || "Failed to process resume");
       }
 
       // Store in localStorage cache for immediate UI responsiveness
@@ -225,7 +225,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
             {uploading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Parsing with Gemini AI...</span>
+                <span>Parsing with AI...</span>
               </>
             ) : (
               <>
@@ -238,7 +238,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           {/* Trust Footer */}
           <div className="pt-2 flex items-center justify-center gap-2 text-[11px] text-zinc-500">
             <ShieldCheck className="w-3.5 h-3.5 text-[#57cc99]" />
-            <span>Encrypted & stored in Supabase Storage</span>
+            <span>Encrypted & stored securely</span>
           </div>
         </div>
       </div>
