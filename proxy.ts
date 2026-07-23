@@ -1,3 +1,4 @@
+/* eslint-disable import/no-anonymous-default-export */
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/session";
 

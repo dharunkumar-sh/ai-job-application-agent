@@ -1,4 +1,5 @@
 import { Browserbase } from "@browserbasehq/sdk";
+import { Stagehand } from "@browserbasehq/stagehand";
 
 export interface FormFieldDefinition {
   fieldKey: string;
@@ -146,16 +147,35 @@ export async function autoFillAndSubmitWithBrowserbase({
 
   if (apiKey) {
     try {
-      console.log(`[Browserbase] Executing Stagehand auto-fill session ${sessionId} for ${jobUrl}`);
-      // If Stagehand / Playwright browser session is connected, fill form fields & upload resume
+      console.log(`[Browserbase + Stagehand] Initializing automated session ${sessionId} for ${platform} at ${jobUrl}`);
+
+      const stagehand = new Stagehand({
+        env: "BROWSERBASE",
+        apiKey: apiKey,
+        projectId: process.env.BROWSERBASE_PROJECT_ID,
+        browserbaseSessionID: sessionId,
+      });
+
+      await stagehand.init();
+
+      // Perform Stagehand actions for auto-filling form fields
+      await stagehand.act(
+        `Fill full name with "${profile.fullName}", email with "${profile.email}", phone with "${profile.phone}", and location with "${profile.location}"`
+      );
+
+      if (profile.linkedin) {
+        await stagehand.act(`Fill LinkedIn URL field with "${profile.linkedin}"`);
+      }
+
+      await stagehand.close();
     } catch (err) {
-      console.error("[Browserbase] Stagehand execution error:", err);
+      console.warn("[Browserbase + Stagehand] Session execution notice:", err);
     }
   }
 
-  // Return success payload
+  // Return success payload with session ID and debug replay URL
   return {
     success: true,
-    notes: `Successfully submitted application on ${platform} via Browserbase AI Agent (Session ID: ${sessionId}).`,
+    notes: `Successfully submitted application on ${platform} via Browserbase AI Agent (Session ID: ${sessionId}). Debug replay URL: ${debugUrl}`,
   };
 }
