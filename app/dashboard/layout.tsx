@@ -37,7 +37,9 @@ export default async function DashboardLayout({
       .eq("user_id", user.id)
       .limit(1);
 
-    if (profile) {
+    if (resumes && resumes.length > 0) {
+      hasCompletedOnboarding = true;
+    } else if (profile) {
       if (profile.full_name) fullName = profile.full_name;
       if (profile.profile_image_url) profileImageUrl = profile.profile_image_url;
       if (
@@ -48,10 +50,6 @@ export default async function DashboardLayout({
       ) {
         hasCompletedOnboarding = true;
       }
-    }
-
-    if (resumes && resumes.length > 0) {
-      hasCompletedOnboarding = true;
     }
   } catch (err) {
     console.warn("Could not fetch profile onboarding status:", err);

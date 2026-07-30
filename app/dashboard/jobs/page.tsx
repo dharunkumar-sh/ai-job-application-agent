@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability */
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
@@ -158,7 +159,48 @@ export default function JobsPage() {
         throw new Error(data.error || "Failed to fetch jobs");
       }
 
-      setJobs(data.jobs || []);
+      let fetchedJobsList: JobRecord[] = data.jobs || [];
+
+      // Fetch user's application statuses from Supabase to overlay on job cards
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data: userApps } = await supabase
+            .from("applications")
+            .select("job_id, status")
+            .eq("user_id", user.id);
+
+          if (userApps && userApps.length > 0) {
+            const appMap = new Map<string, string>();
+            userApps.forEach((a) => {
+              if (a.job_id) appMap.set(a.job_id, a.status);
+            });
+
+            fetchedJobsList = fetchedJobsList.map((j) => {
+              const status = appMap.get(j.id);
+              if (status) {
+                return {
+                  ...j,
+                  application_status: status,
+                  applied_status:
+                    status === "Submitted" ||
+                    status === "Manual Apply" ||
+                    Boolean(j.applied_status),
+                };
+              }
+              return j;
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Could not map application status onto jobs:", e);
+      }
+
+      setJobs(fetchedJobsList);
       setIsCached(Boolean(data.cached));
       setLastFetchedAt(data.fetchedAt || new Date().toISOString());
 
@@ -194,11 +236,15 @@ export default function JobsPage() {
 
       const targetJob = jobs.find((j) => j.id === jobId);
 
-      // Call API
+      // Call API with jobId and job object
       await fetch("/api/jobs/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId, savedStatus: newSavedState }),
+        body: JSON.stringify({
+          jobId,
+          job: targetJob,
+          savedStatus: newSavedState,
+        }),
       });
 
       // Add activity log
@@ -526,3 +572,4 @@ export default function JobsPage() {
     </div>
   );
 }
+

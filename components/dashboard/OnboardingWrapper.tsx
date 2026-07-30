@@ -18,27 +18,12 @@ export function OnboardingWrapper({
   }, [initialHasCompletedOnboarding]);
 
   const checkOnboardingStatus = async () => {
-    // 1. If server already marked onboarding as completed, do not open prompt box
+    // 1. If server marked onboarding as completed, do not open prompt box
     if (initialHasCompletedOnboarding) {
       setIsOpen(false);
       return;
     }
 
-    // 2. Check localStorage cached profile first
-    try {
-      const cached = localStorage.getItem("jobbuddy_parsed_profile");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed && (parsed.headline || parsed.skills?.length || parsed.summary || parsed.fullName)) {
-          setIsOpen(false);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn("Could not check cached profile:", e);
-    }
-
-    // 3. Query Supabase DB for profile & resumes
     const supabase = createClient();
     const {
       data: { user },
@@ -50,8 +35,8 @@ export function OnboardingWrapper({
     }
 
     try {
-      // Check if user has uploaded at least 1 resume in Supabase
-      const { data: resumes } = await supabase
+      // 2. Strict DB Check: If user has ANY uploaded resume in Supabase, NEVER show upload popup
+      const { data: resumes, error: resumeErr } = await supabase
         .from("resumes")
         .select("id")
         .eq("user_id", user.id)
@@ -62,7 +47,21 @@ export function OnboardingWrapper({
         return;
       }
 
-      // Check profile fields
+      // 3. Check localStorage cached profile/resume
+      try {
+        const cached = localStorage.getItem("jobbuddy_parsed_profile");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && (parsed.headline || parsed.skills?.length || parsed.summary || parsed.fullName || parsed.filename)) {
+            setIsOpen(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not check cached profile:", e);
+      }
+
+      // 4. Check profile fields
       const { data: profile } = await supabase
         .from("profiles")
         .select("has_completed_onboarding, headline, summary, skills, full_name")
@@ -83,7 +82,7 @@ export function OnboardingWrapper({
         return;
       }
 
-      // Check work experience table
+      // 5. Check work experience table
       const { data: work } = await supabase
         .from("work_experiences")
         .select("id")

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import {
   Briefcase,
+  Bookmark,
   FileText,
   User,
   Target,
@@ -31,6 +32,11 @@ export function Sidebar() {
       name: "Jobs",
       href: "/dashboard/jobs",
       icon: Briefcase,
+    },
+    {
+      name: "Saved Jobs",
+      href: "/dashboard/saved-jobs",
+      icon: Bookmark,
     },
     {
       name: "Resume",
