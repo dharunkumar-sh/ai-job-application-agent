@@ -80,11 +80,11 @@ export default function BillingPage() {
     const priceAmount =
       planName === "Pro"
         ? billingCycle === "monthly"
-          ? 19
-          : 180
+          ? 1499
+          : 14390
         : billingCycle === "monthly"
-        ? 49
-        : 470;
+        ? 3999
+        : 38390;
 
     const interval = billingCycle === "monthly" ? "month" : "year";
 
@@ -109,7 +109,7 @@ export default function BillingPage() {
         const options = {
           key: data.keyId,
           amount: data.amount,
-          currency: data.currency || "USD",
+          currency: data.currency || "INR",
           name: "JobBuddy AI",
           description: `${planName} Plan Subscription`,
           order_id: data.orderId,
@@ -301,10 +301,10 @@ export default function BillingPage() {
             <div className="pt-2 space-y-1">
               <div className="text-2xl font-black text-white">
                 {activePlanName === "Free"
-                  ? "$0 / month"
+                  ? "₹0 / month"
                   : activePlanName === "Pro"
-                  ? "$19 / month"
-                  : "$49 / month"}
+                  ? "₹1,499 / month"
+                  : "₹3,999 / month"}
               </div>
               <div className="text-xs text-zinc-400 font-medium">
                 {isUnlimited ? "Unlimited AI Applies per day" : `${planLimit} AI Applies per day`}
@@ -380,7 +380,7 @@ export default function BillingPage() {
         <div className="bg-[#16161b] border border-[#23232b] rounded-3xl p-6 shadow-xl flex flex-col justify-between space-y-4">
           <div className="space-y-2">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Zap className="w-4 h-4 text-[#57cc99]" />
+              <Zap className="w-4 h-[#57cc99]" />
               Manage Subscription
             </h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
@@ -460,7 +460,57 @@ export default function BillingPage() {
 
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {plans.map((plan) => {
+          {[
+            {
+              name: "Free",
+              description: "Essential AI job search automation for casual job seekers.",
+              monthlyPrice: 0,
+              annualPrice: 0,
+              limitText: "5 AI Job Applies / day",
+              features: [
+                "Maximum 5 AI job applies per day",
+                "Stagehand AI form field detection",
+                "Automated candidate profile filling",
+                "Resume attachment support",
+                "Basic application status tracking",
+              ],
+              highlight: false,
+            },
+            {
+              name: "Pro",
+              description: "High-volume AI job applications for active candidates.",
+              monthlyPrice: 1499,
+              annualPrice: 1199,
+              limitText: "25 AI Job Applies / day",
+              features: [
+                "Maximum 25 AI job applies per day",
+                "Priority Stagehand AI form filling",
+                "Automatic work authorization & visa screening",
+                "Instant missing profile field quick-fill",
+                "Live Browserbase session debug replays",
+                "Priority customer support",
+              ],
+              highlight: true,
+              badge: "Most Popular",
+            },
+            {
+              name: "Unlimited",
+              description: "Unrestricted AI job apply capacity for aggressive job hunting.",
+              monthlyPrice: 3999,
+              annualPrice: 3199,
+              limitText: "Unlimited AI Job Applies / day",
+              features: [
+                "Unlimited AI job applies per day",
+                "Zero daily apply limits or restrictions",
+                "Ultra-fast Browserbase AI agent execution",
+                "Automated EEOC & voluntary disclosure answers",
+                "Unlimited saved jobs & application history",
+                "1-on-1 dedicated customer support",
+              ],
+              highlight: false,
+              badge: "Maximum Power",
+            },
+          ].map((plan) => {
             const isCurrent = activePlanName === plan.name;
             const price = billingCycle === "monthly" ? plan.monthlyPrice : plan.annualPrice;
 
@@ -489,7 +539,7 @@ export default function BillingPage() {
 
                   <div className="pt-2 pb-2 border-y border-[#23232b]">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-3xl sm:text-4xl font-black text-white">${price}</span>
+                      <span className="text-3xl sm:text-4xl font-black text-white">₹{price.toLocaleString("en-IN")}</span>
                       <span className="text-xs text-zinc-400 font-semibold">
                         / {billingCycle === "monthly" ? "month" : "month (billed annually)"}
                       </span>

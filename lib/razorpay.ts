@@ -22,7 +22,7 @@ export async function createRazorpayOrder({
   userEmail,
   planName,
   priceAmount,
-  currency = "USD",
+  currency = "INR",
 }: CreateRazorpayOrderParams) {
   const planLimit = planName === "Pro" ? 25 : -1;
 

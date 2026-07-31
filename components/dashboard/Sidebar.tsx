@@ -63,11 +63,6 @@ export function Sidebar() {
       href: "/dashboard/profile",
       icon: User,
     },
-    {
-      name: "Application Status",
-      href: "/dashboard/applications",
-      icon: Target,
-    },
   ];
 
   const bottomNavItems = [

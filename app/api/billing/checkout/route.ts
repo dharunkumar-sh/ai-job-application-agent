@@ -22,14 +22,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const amount = priceAmount || (planName === "Pro" ? 19 : 49);
+    const amount = priceAmount || (planName === "Pro" ? 1499 : 3999);
 
     const order = await createRazorpayOrder({
       userId: user.id,
       userEmail: user.email || "",
       planName: planName as "Pro" | "Unlimited",
       priceAmount: amount,
-      currency: "USD",
+      currency: "INR",
     });
 
     const keyId =
