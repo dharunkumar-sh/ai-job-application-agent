@@ -25,6 +25,7 @@ import {
   UploadCloud,
   FileText,
   Save,
+  Zap,
 } from "lucide-react";
 import { JobRecord } from "./JobCard";
 
@@ -44,7 +45,7 @@ export function ApplyDialog({
   const router = useRouter();
 
   const [step, setStep] = useState<
-    "choice" | "processing" | "missing_profile" | "fill_missing" | "submitted"
+    "choice" | "processing" | "missing_profile" | "fill_missing" | "submitted" | "limit_reached"
   >("choice");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -174,6 +175,11 @@ export function ApplyDialog({
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.limitReached || res.status === 403) {
+          setErrorMsg(data.error || "Daily apply limit reached.");
+          setStep("limit_reached");
+          return;
+        }
         throw new Error(data.error || "Auto-apply process failed");
       }
 
@@ -819,6 +825,58 @@ export function ApplyDialog({
             >
               Done
             </button>
+          </div>
+        )}
+
+        {/* STEP 6: DAILY APPLY LIMIT REACHED */}
+        {step === "limit_reached" && (
+          <div className="py-6 text-center space-y-6 overflow-y-auto">
+            <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
+              <Zap className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-white">Daily Apply Limit Reached</h3>
+              <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
+                {errorMsg ||
+                  "You have reached your daily limit of AI job applies. Upgrade your plan to continue applying automatically!"}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#0f0f12] border border-[#23232b] text-left text-xs space-y-2.5 max-w-md mx-auto">
+              <div className="text-[11px] font-extrabold text-zinc-400 uppercase tracking-wider">
+                Available Upgrade Options:
+              </div>
+              <div className="flex items-center justify-between text-zinc-200 pt-1 border-t border-[#23232b]">
+                <span className="font-semibold">Pro Plan (25 Applies / day)</span>
+                <span className="font-bold text-[#57cc99]">$19 / mo</span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-200 pt-1 border-t border-[#23232b]">
+                <span className="font-semibold">Unlimited Plan (Unlimited)</span>
+                <span className="font-bold text-[#57cc99]">$49 / mo</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 py-3 bg-[#0f0f12] hover:bg-[#1e1e26] border border-[#23232b] text-zinc-300 font-bold text-xs rounded-2xl transition-all cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleClose();
+                  router.push("/dashboard/billing");
+                }}
+                className="flex-1 py-3 bg-gradient-to-r from-[#57cc99] to-[#80ed99] text-[#0f0f12] font-black text-xs rounded-2xl shadow-lg shadow-[#57cc99]/20 hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Upgrade Plan</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
@@ -11,7 +11,6 @@ import {
   User,
   Target,
   CreditCard,
-  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -21,7 +20,23 @@ import {
 
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [subInfo, setSubInfo] = useState<{ planName: string; used: number; limit: number | string } | null>(null);
   const pathname = usePathname();
+
+  useEffect(() => {
+    fetch("/api/billing/subscription")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.subscription) {
+          setSubInfo({
+            planName: data.subscription.planName,
+            used: data.subscription.dailyUsageCount,
+            limit: data.subscription.isUnlimited ? "Unlimited" : data.subscription.planLimit,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -57,14 +72,9 @@ export function Sidebar() {
 
   const bottomNavItems = [
     {
-      name: "Billing / Credits",
+      name: "Billing & Subscription",
       href: "/dashboard/billing",
       icon: CreditCard,
-    },
-    {
-      name: "Profile Settings",
-      href: "/dashboard/settings",
-      icon: Settings,
     },
   ];
 
@@ -143,24 +153,38 @@ export function Sidebar() {
         </nav>
       </div>
 
-      {/* BOTTOM SECTION: Footer (Billing, Credits Display, Settings, Sign Out) */}
+      {/* BOTTOM SECTION: Footer (Billing, Subscription Plan Display, Settings, Sign Out) */}
       <div className="p-3 border-t border-[#23232b] space-y-3">
-        {/* Credits Display Section */}
+        {/* Live Plan & Daily Applies Usage Display */}
         {!isCollapsed ? (
           <div className="p-3.5 rounded-2xl bg-[#0f0f12] border border-[#23232b] space-y-2.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-400 font-medium flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#57cc99]" />
-                Credits Available
+                <span>{subInfo?.planName || "Free"} Plan</span>
               </span>
-              <span className="font-bold text-[#57cc99]">250 / 500</span>
+              <span className="font-bold text-[#57cc99]">
+                {subInfo?.limit === "Unlimited"
+                  ? "Unlimited"
+                  : `${subInfo?.used || 0} / ${subInfo?.limit || 5}`}
+              </span>
             </div>
 
             {/* Progress Bar */}
             <div className="w-full h-2 rounded-full bg-[#1e1e26] overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-[#57cc99] to-[#80ed99] rounded-full transition-all duration-500"
-                style={{ width: "50%" }}
+                style={{
+                  width:
+                    subInfo?.limit === "Unlimited"
+                      ? "100%"
+                      : `${Math.min(
+                          100,
+                          Math.round(
+                            ((subInfo?.used || 0) / Number(subInfo?.limit || 5)) * 100
+                          )
+                        )}%`,
+                }}
               />
             </div>
 
@@ -168,16 +192,18 @@ export function Sidebar() {
               href="/dashboard/billing"
               className="flex items-center justify-between text-[11px] font-bold text-[#57cc99] hover:underline pt-0.5"
             >
-              <span>Upgrade Plan</span>
+              <span>Manage / Upgrade</span>
               <Zap className="w-3 h-3" />
             </Link>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center p-2 rounded-2xl bg-[#0f0f12] border border-[#23232b] text-center group relative">
             <Sparkles className="w-4 h-4 text-[#57cc99]" />
-            <span className="text-[10px] font-extrabold text-[#57cc99] mt-0.5">250</span>
+            <span className="text-[10px] font-extrabold text-[#57cc99] mt-0.5">
+              {subInfo?.limit === "Unlimited" ? "∞" : `${subInfo?.used || 0}/${subInfo?.limit || 5}`}
+            </span>
             <div className="absolute left-full ml-3 px-3 py-1.5 bg-[#1e1e26] text-white text-xs font-semibold rounded-xl border border-[#23232b] shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-              250 / 500 Credits Available
+              {subInfo?.planName || "Free"} Plan: {subInfo?.used || 0} / {subInfo?.limit || 5} Daily Applies
             </div>
           </div>
         )}

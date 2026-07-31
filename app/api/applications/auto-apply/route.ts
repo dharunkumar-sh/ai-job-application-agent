@@ -8,6 +8,10 @@ import {
   CandidateProfile,
   autoFillAndSubmitWithBrowserbase,
 } from "@/lib/browserbase";
+import {
+  checkDailyApplyLimit,
+  incrementDailyApplyCount,
+} from "@/lib/subscriptions";
 
 async function ensureJobExists(
   supabase: any,
@@ -78,6 +82,22 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check user subscription and daily apply limit
+    const limitCheck = await checkDailyApplyLimit(supabase, user.id);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: limitCheck.message,
+          limitReached: true,
+          planName: limitCheck.planName,
+          limit: limitCheck.limit,
+          used: limitCheck.used,
+          remaining: 0,
+        },
+        { status: 403 }
+      );
     }
 
     const {
@@ -244,6 +264,9 @@ export async function POST(request: Request) {
         .update({ applied_status: true })
         .eq("id", jobId);
     }
+
+    // Increment user's daily application count
+    await incrementDailyApplyCount(supabase, user.id);
 
     return NextResponse.json({
       success: true,

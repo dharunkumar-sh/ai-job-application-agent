@@ -21,6 +21,7 @@ import {
   Layers,
   Sparkles,
   XCircle,
+  Trash2,
 } from "lucide-react";
 
 interface ApplicationRecord {
@@ -146,6 +147,43 @@ export default function ApplicationsPage() {
     }
   };
 
+  const handleDeleteApplication = async (applicationId: string) => {
+    try {
+      setApplications((prev) => prev.filter((a) => a.id !== applicationId));
+
+      await fetch("/api/applications/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId }),
+      });
+    } catch (e) {
+      console.error("Failed to delete application:", e);
+      fetchApplications();
+    }
+  };
+
+  const handleClearAllApplications = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to clear all application records from history?"
+      )
+    )
+      return;
+
+    try {
+      setApplications([]);
+
+      await fetch("/api/applications/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearAll: true }),
+      });
+    } catch (e) {
+      console.error("Failed to clear all applications:", e);
+      fetchApplications();
+    }
+  };
+
   // Metrics summary calculations
   const stats = useMemo(() => {
     const total = applications.length;
@@ -255,15 +293,28 @@ export default function ApplicationsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={fetchApplications}
-          disabled={loading}
-          className="px-5 py-3.5 bg-[#0f0f12] hover:bg-[#1e1e26] border border-[#23232b] text-zinc-200 hover:text-white font-bold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] shrink-0"
-        >
-          <RefreshCw className={`w-4 h-4 text-[#57cc99] ${loading ? "animate-spin" : ""}`} />
-          <span>Refresh Pipeline</span>
-        </button>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleClearAllApplications}
+            disabled={loading || applications.length === 0}
+            className="px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-bold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-40"
+            title="Clear all application records from history"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Clear History</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={fetchApplications}
+            disabled={loading}
+            className="px-5 py-3.5 bg-[#0f0f12] hover:bg-[#1e1e26] border border-[#23232b] text-zinc-200 hover:text-white font-bold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] shrink-0"
+          >
+            <RefreshCw className={`w-4 h-4 text-[#57cc99] ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh Pipeline</span>
+          </button>
+        </div>
       </div>
 
       {/* Metrics Summary Cards */}
@@ -509,17 +560,29 @@ export default function ApplicationsPage() {
                       </span>
                     </div>
 
-                    {jobUrl && (
-                      <a
-                        href={jobUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-xl bg-[#0f0f12] hover:bg-[#1e1e26] border border-[#23232b] text-zinc-300 hover:text-white text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                    <div className="flex items-center gap-2 shrink-0">
+                      {jobUrl && (
+                        <a
+                          href={jobUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-[#0f0f12] hover:bg-[#1e1e26] border border-[#23232b] text-zinc-300 hover:text-white text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Job Posting</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteApplication(app.id)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 text-[11px] font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                        title="Clear application record"
                       >
-                        <span>Job Posting</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

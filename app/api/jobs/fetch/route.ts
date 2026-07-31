@@ -44,18 +44,12 @@ export async function GET(request: Request) {
         const validCachedJobs = cachedJobs.filter(isRealJobPosting);
 
         if (validCachedJobs.length > 0) {
-          const latestFetchTime = new Date(validCachedJobs[0].fetched_at || validCachedJobs[0].created_at).getTime();
-          const sixHoursInMs = 6 * 60 * 60 * 1000;
-          const isFresh = Date.now() - latestFetchTime < sixHoursInMs;
-
-          if (isFresh) {
-            return NextResponse.json({
-              jobs: validCachedJobs,
-              cached: true,
-              fetchedAt: validCachedJobs[0].fetched_at,
-              message: "Loaded jobs from 6-hour cache",
-            });
-          }
+          return NextResponse.json({
+            jobs: validCachedJobs,
+            cached: true,
+            fetchedAt: validCachedJobs[0].fetched_at,
+            message: "Loaded jobs from database cache",
+          });
         }
       }
     }

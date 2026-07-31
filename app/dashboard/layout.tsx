@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { OnboardingWrapper } from "@/components/dashboard/OnboardingWrapper";
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 
 export default async function DashboardLayout({
   children,
@@ -85,34 +86,32 @@ export default async function DashboardLayout({
               <span>JobBuddy Active</span>
             </div>
 
-            {/* Notification Icon */}
-            <button className="w-10 h-10 rounded-2xl bg-[#0f0f12] border border-[#23232b] flex items-center justify-center text-zinc-400 hover:text-white hover:border-[#57cc99]/30 transition-all relative cursor-pointer">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#57cc99]" />
-            </button>
-
-            {/* User Profile Badge */}
-            <div className="flex items-center gap-3 pl-3 border-l border-[#23232b]">
+            {/* User Profile Badge (Header Profile Avatar) */}
+            <Link
+              href="/dashboard/profile"
+              className="flex items-center gap-3 pl-3 border-l border-[#23232b] hover:opacity-90 transition-all cursor-pointer group"
+              title="View Profile Settings"
+            >
               {profileImageUrl ? (
                 <img
                   src={profileImageUrl}
                   alt={fullName}
-                  className="w-9 h-9 rounded-2xl object-cover border border-[#57cc99]/30 shadow-md shadow-[#57cc99]/20"
+                  className="w-10 h-10 rounded-2xl object-cover border-2 border-[#57cc99]/40 shadow-md shadow-[#57cc99]/20 group-hover:border-[#57cc99] transition-all"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-2xl bg-[#57cc99] flex items-center justify-center font-extrabold text-[#0f0f12] text-sm shadow-md shadow-[#57cc99]/20">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#57cc99] to-[#80ed99] flex items-center justify-center font-extrabold text-[#0f0f12] text-sm shadow-md shadow-[#57cc99]/20 group-hover:scale-105 transition-transform">
                   {fullName.substring(0, 2).toUpperCase()}
                 </div>
               )}
               <div className="hidden sm:block text-left">
-                <div className="text-xs font-bold text-white leading-tight truncate max-w-[140px]">
+                <div className="text-xs font-bold text-white leading-tight truncate max-w-[140px] group-hover:text-[#57cc99] transition-colors">
                   {fullName}
                 </div>
                 <div className="text-[11px] text-zinc-400 truncate max-w-[140px]">
                   {email}
                 </div>
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 
