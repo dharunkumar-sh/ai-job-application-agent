@@ -1,26 +1,27 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   CreditCard,
   Sparkles,
   Zap,
   CheckCircle2,
-  AlertTriangle,
   Loader2,
   ExternalLink,
   ShieldCheck,
   RefreshCw,
   Clock,
-  ArrowRight,
   Check,
-  Building2,
   Calendar,
-  Layers,
-  HelpCircle,
 } from "lucide-react";
 import { UserSubscriptionDetails } from "@/lib/subscriptions";
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export default function BillingPage() {
   const searchParams = useSearchParams();
@@ -43,6 +44,18 @@ export default function BillingPage() {
         } Plan.`
       );
     }
+
+    // Load Razorpay Checkout Script
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
   }, [checkoutSuccess, checkoutPlan]);
 
   const fetchSubscriptionDetails = async () => {
@@ -92,14 +105,51 @@ export default function BillingPage() {
         throw new Error(data.error || "Failed to initiate subscription");
       }
 
-      if (data.url) {
-        window.location.href = data.url;
+      if (data.orderId && window.Razorpay) {
+        const options = {
+          key: data.keyId,
+          amount: data.amount,
+          currency: data.currency || "USD",
+          name: "JobBuddy AI",
+          description: `${planName} Plan Subscription`,
+          order_id: data.orderId,
+          prefill: {
+            name: data.userName,
+            email: data.userEmail,
+          },
+          theme: {
+            color: "#57cc99",
+          },
+          handler: async function (response: any) {
+            try {
+              const verifyRes = await fetch("/api/billing/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  planName,
+                }),
+              });
+              if (verifyRes.ok) {
+                setNotice(`🎉 Upgrade successful! You are now on the ${planName} Plan.`);
+                await fetchSubscriptionDetails();
+              }
+            } catch (err) {
+              console.error("Payment verification failed:", err);
+            }
+          },
+        };
+
+        const razorpayInstance = new window.Razorpay(options);
+        razorpayInstance.open();
       } else {
         await fetchSubscriptionDetails();
       }
     } catch (err: any) {
       console.error("Subscription error:", err);
-      alert(err.message || "Could not start checkout");
+      alert(err.message || "Could not start Razorpay checkout");
     } finally {
       setSubmitting(null);
     }
@@ -113,8 +163,8 @@ export default function BillingPage() {
       });
       const data = await res.json();
 
-      if (res.ok && data.url) {
-        window.location.href = data.url;
+      if (res.ok) {
+        setNotice("Razorpay Billing Management active for current subscription.");
       }
     } catch (err) {
       console.error("Portal error:", err);
@@ -228,7 +278,7 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* 3-COLUMN OVERVIEW CARDS: 1. Current Plan | 2. Usage Info | 3. Manage Subscription */}
+      {/* 3-COLUMN OVERVIEW CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* SECTION 1: Current Plan */}
         <div className="bg-[#16161b] border border-[#23232b] rounded-3xl p-6 shadow-xl flex flex-col justify-between space-y-4">
@@ -334,7 +384,7 @@ export default function BillingPage() {
               Manage Subscription
             </h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Update your payment methods, download invoices, or change plan settings directly via Stripe.
+              Update your payment methods, download invoices, or change plan settings securely via Razorpay.
             </p>
           </div>
 
@@ -350,7 +400,7 @@ export default function BillingPage() {
               ) : (
                 <>
                   <ExternalLink className="w-4 h-4 text-[#57cc99]" />
-                  <span>Stripe Billing Portal</span>
+                  <span>Razorpay Customer Portal</span>
                 </>
               )}
             </button>
@@ -368,7 +418,7 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* SECTION 4: Available Plans (Pricing Cards) */}
+      {/* SECTION 4: Available Plans */}
       <div id="available-plans" className="space-y-6 pt-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -423,7 +473,6 @@ export default function BillingPage() {
                     : "border-[#23232b] hover:border-zinc-700"
                 }`}
               >
-                {/* Badge Header */}
                 {plan.badge && (
                   <div className="absolute -top-3.5 right-6 px-3 py-1 rounded-full bg-gradient-to-r from-[#57cc99] to-[#80ed99] text-[#0f0f12] text-[10px] font-black uppercase tracking-wider shadow-md">
                     {plan.badge}
@@ -438,7 +487,6 @@ export default function BillingPage() {
                     </p>
                   </div>
 
-                  {/* Pricing Display */}
                   <div className="pt-2 pb-2 border-y border-[#23232b]">
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl sm:text-4xl font-black text-white">${price}</span>
@@ -452,7 +500,6 @@ export default function BillingPage() {
                     </div>
                   </div>
 
-                  {/* Features List */}
                   <div className="space-y-2.5 pt-2">
                     <div className="text-xs font-extrabold text-white uppercase tracking-wider">
                       Included Features:
@@ -468,7 +515,6 @@ export default function BillingPage() {
                   </div>
                 </div>
 
-                {/* Call to Action Button */}
                 <div className="pt-4">
                   {isCurrent ? (
                     <button

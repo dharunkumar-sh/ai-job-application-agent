@@ -10,8 +10,10 @@ export interface UserSubscriptionDetails {
   isUnlimited: boolean;
   status: string; // "active", "canceled", "trialing", etc.
   paymentStatus: string; // "paid", "free", "unpaid"
-  stripeCustomerId?: string | null;
-  stripeSubscriptionId?: string | null;
+  razorpayCustomerId?: string | null;
+  razorpaySubscriptionId?: string | null;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
   currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   lastUsageDate: string;
@@ -91,8 +93,10 @@ export async function getUserSubscription(
         isUnlimited,
         status: data.status || "active",
         paymentStatus: data.payment_status || (planName === "Free" ? "free" : "paid"),
-        stripeCustomerId: data.stripe_customer_id || null,
-        stripeSubscriptionId: data.stripe_subscription_id || null,
+        razorpayCustomerId: data.razorpay_customer_id || null,
+        razorpaySubscriptionId: data.razorpay_subscription_id || null,
+        razorpayOrderId: data.razorpay_order_id || null,
+        razorpayPaymentId: data.razorpay_payment_id || null,
         currentPeriodStart: data.current_period_start || null,
         currentPeriodEnd: data.current_period_end || null,
         lastUsageDate: todayStr,
@@ -205,8 +209,10 @@ export async function incrementDailyApplyCount(
         last_usage_date: todayStr,
         status: sub.status,
         payment_status: sub.paymentStatus,
-        stripe_customer_id: sub.stripeCustomerId,
-        stripe_subscription_id: sub.stripeSubscriptionId,
+        razorpay_customer_id: sub.razorpayCustomerId,
+        razorpay_subscription_id: sub.razorpaySubscriptionId,
+        razorpay_order_id: sub.razorpayOrderId,
+        razorpay_payment_id: sub.razorpayPaymentId,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
@@ -218,13 +224,15 @@ export async function incrementDailyApplyCount(
   return newCount;
 }
 
-export async function updateUserSubscriptionFromStripe(
+export async function updateUserSubscriptionFromRazorpay(
   supabase: SupabaseClient,
   payload: {
     userId: string;
     planName: "Pro" | "Unlimited";
-    stripeCustomerId?: string;
-    stripeSubscriptionId?: string;
+    razorpayCustomerId?: string;
+    razorpaySubscriptionId?: string;
+    razorpayOrderId?: string;
+    razorpayPaymentId?: string;
     status?: string;
     currentPeriodStart?: string;
     currentPeriodEnd?: string;
@@ -238,8 +246,10 @@ export async function updateUserSubscriptionFromStripe(
     user_id: payload.userId,
     plan_name: payload.planName,
     plan_limit: planLimit,
-    stripe_customer_id: payload.stripeCustomerId || null,
-    stripe_subscription_id: payload.stripeSubscriptionId || null,
+    razorpay_customer_id: payload.razorpayCustomerId || null,
+    razorpay_subscription_id: payload.razorpaySubscriptionId || null,
+    razorpay_order_id: payload.razorpayOrderId || null,
+    razorpay_payment_id: payload.razorpayPaymentId || null,
     status: payload.status || "active",
     payment_status: payload.paymentStatus || "paid",
     current_period_start: payload.currentPeriodStart || new Date().toISOString(),
@@ -253,6 +263,6 @@ export async function updateUserSubscriptionFromStripe(
       onConflict: "user_id",
     });
   } catch (err) {
-    console.error("Error saving Stripe subscription to database:", err);
+    console.error("Error saving Razorpay subscription to database:", err);
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createStripeCheckoutSession } from "@/lib/stripe";
+import { createRazorpayOrder } from "@/lib/razorpay";
 
 export async function POST(request: Request) {
   try {
@@ -23,23 +23,34 @@ export async function POST(request: Request) {
     }
 
     const amount = priceAmount || (planName === "Pro" ? 19 : 49);
-    const returnUrl = `${request.headers.get("origin") || "http://localhost:3000"}/dashboard/billing`;
 
-    // Create Stripe Checkout session using sandbox keys from environment
-    const session = await createStripeCheckoutSession({
+    const order = await createRazorpayOrder({
       userId: user.id,
       userEmail: user.email || "",
       planName: planName as "Pro" | "Unlimited",
       priceAmount: amount,
-      interval: interval || "month",
-      returnUrl,
+      currency: "USD",
     });
 
-    return NextResponse.json({ success: true, url: session.url });
+    const keyId =
+      process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+      process.env.RAZORPAY_KEY_ID ||
+      "rzp_test_TAoMNbdM4a6bzd";
+
+    return NextResponse.json({
+      success: true,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId,
+      planName,
+      userEmail: user.email || "",
+      userName: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+    });
   } catch (error: any) {
-    console.error("Billing checkout error:", error);
+    console.error("Razorpay checkout error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to initiate checkout session" },
+      { error: error.message || "Failed to initiate Razorpay order" },
       { status: 500 }
     );
   }
