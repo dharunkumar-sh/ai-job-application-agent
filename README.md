@@ -1,4 +1,5 @@
 <div align="center">  
+  
   # JobBuddy AI
   
   **Smart AI Job Search Assistant & Resume Workspace — Automate applications, optimize resumes, and land interviews faster with AI-powered automation.**
