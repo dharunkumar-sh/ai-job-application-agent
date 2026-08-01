@@ -1,6 +1,4 @@
-<div align="center">
-  <img src="https://raw.githubusercontent.com/dharunkumar-sh/ai-job-application-agent/main/public/logo.png" alt="JobBuddy AI Logo" width="120" height="120" style="border-radius: 20px;">
-  
+<div align="center">  
   # JobBuddy AI
   
   **Smart AI Job Search Assistant & Resume Workspace — Automate applications, optimize resumes, and land interviews faster with AI-powered automation.**
